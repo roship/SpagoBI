@@ -5,7 +5,6 @@
  * If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 package it.eng.spagobi.behaviouralmodel.lov.bo;
 
-import static it.eng.spagobi.commons.constants.SpagoBIConstants.DATE_RANGE_TYPE;
 import it.eng.spago.base.SourceBean;
 import it.eng.spago.base.SourceBeanException;
 import it.eng.spago.dbaccess.Utils;
@@ -36,7 +35,11 @@ import it.eng.spagobi.utilities.DateRangeUtils;
 import it.eng.spagobi.utilities.assertion.Assert;
 import it.eng.spagobi.utilities.exceptions.SpagoBIRuntimeException;
 import it.eng.spagobi.utilities.objects.Couple;
+import org.apache.commons.lang.StringEscapeUtils;
+import org.apache.commons.validator.GenericValidator;
+import org.apache.log4j.Logger;
 
+import javax.naming.NamingException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.text.DateFormat;
@@ -44,6 +47,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -51,11 +55,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-import javax.naming.NamingException;
-
-import org.apache.commons.lang.StringEscapeUtils;
-import org.apache.commons.validator.GenericValidator;
-import org.apache.log4j.Logger;
+import static it.eng.spagobi.commons.constants.SpagoBIConstants.DATE_RANGE_TYPE;
 
 //import it.eng.spagobi.commons.utilities.DataSourceUtilities;
 
@@ -306,18 +306,100 @@ public class QueryDetail extends AbstractLOV implements ILovDetail {
 	 *            The execution instance (useful to retrieve dependencies values)
 	 * @return the in-line view that filters the original lov using the dependencies.
 	 */
-	public String getWrappedStatement(List<ObjParuse> dependencies, List<BIObjectParameter> BIObjectParameters) {
-		logger.debug("IN");
-		String result = getQueryDefinition();
-		if (dependencies != null && dependencies.size() > 0 && BIObjectParameters != null) {
-			StringBuffer buffer = new StringBuffer();
-			buffer.append("SELECT * FROM (" + getQueryDefinition() + ") LovTableForCache ");
-			buildWhereClause(buffer, dependencies, BIObjectParameters);
-			result = buffer.toString();
-		}
-		logger.debug("OUT.result=" + result);
-		return result;
-	}
+    public String getWrappedStatement(List<ObjParuse> dependencies, List<BIObjectParameter> BIObjectParameters) throws Exception {
+        logger.debug("IN");
+        String result = getQueryDefinition();
+        if (dependencies != null && dependencies.size() > 0 && BIObjectParameters != null) {
+
+            if (!allDependenciesSet(dependencies, BIObjectParameters)) {
+                result = getEmptyQuery();
+            } else {
+                final String queryDefinition = getQueryDefinition();
+                if (hasInlineParametersDirective(queryDefinition)) {
+                    result = inlineParametersStrategy(queryDefinition, BIObjectParameters);
+                } else {
+                    result = defaultParametersStrategy(dependencies, BIObjectParameters);
+                }
+            }
+        }
+        logger.debug("OUT.result=" + result);
+        return result;
+    }
+
+    private String defaultParametersStrategy(List<ObjParuse> dependencies, List<BIObjectParameter> BIObjectParameters) {
+        StringBuffer buffer = new StringBuffer();
+        buffer.append("SELECT * FROM (" + queryDefinition + ") LovTableForCache ");
+        buildWhereClause(buffer, dependencies, BIObjectParameters);
+        return buffer.toString();
+    }
+
+    private boolean hasInlineParametersDirective(String queryDefinition) {
+        final int index = queryDefinition.indexOf('\n');
+        if (index > 0) {
+            final String firstLine = queryDefinition.substring(0, index).trim();
+            return firstLine.startsWith("--") && firstLine.indexOf("INLINE-PARAMETERS") > 0;
+        }
+
+        return false;
+    }
+
+    private String inlineParametersStrategy(String queryDefinition, List<BIObjectParameter> biObjectParameters) throws Exception {
+        Map<String, Object> parametersMap = new HashMap<>();
+        for (BIObjectParameter biObjectParameter : biObjectParameters) {
+            final Parameter parameter = biObjectParameter.getParameter();
+            final String id = "ID_" + parameter.getModalityValue().getId();
+            String value = biObjectParameter.getParameterValuesAsString();
+
+            final Domain domain = DAOFactory.getDomainDAO().loadDomainById(parameter.getTypeId());
+            final String valueCd = domain.getValueCd();
+            if (!valueCd.equalsIgnoreCase("NUM")) {
+                value = "'" + value + "'";
+            }
+            parametersMap.put(id, value);
+        }
+
+        return StringUtilities.substituteParametersInString(queryDefinition, parametersMap);
+    }
+
+    private Map<Integer, BIObjectParameter> getParametersMapById(List<BIObjectParameter> BIObjectParameters) {
+        Map<Integer, BIObjectParameter> parameters = new HashMap<>();
+        for (BIObjectParameter parameter : BIObjectParameters) {
+            parameters.put(parameter.getId(), parameter);
+        }
+        return parameters;
+    }
+
+    private boolean allDependenciesSet(List<ObjParuse> dependencies, List<BIObjectParameter> BIObjectParameters) {
+        boolean allParametersSet = true;
+
+        final Map<Integer, BIObjectParameter> parametersById = getParametersMapById(BIObjectParameters);
+        for (int i = 0; i < dependencies.size() && allParametersSet; i++) {
+            final ObjParuse dependency = dependencies.get(i);
+            final BIObjectParameter parameter = parametersById.get(dependency.getObjParFatherId());
+            allParametersSet = checkParameter(parameter);
+        }
+        return allParametersSet;
+    }
+
+    public boolean checkParameter(BIObjectParameter parameter) {
+        return parameter != null
+                && parameter.getParameterValues() != null
+                && !parameter.getParameterValues().isEmpty()
+                && parameter.getParameterValues().get(0) != null;
+    }
+
+    private String getEmptyQuery() {
+        switch (databaseDialect) {
+            case DIALECT_POSTGRES:
+            case DIALECT_MYSQL:
+                return "SELECT null";
+            case DIALECT_ORACLE:
+            case DIALECT_ORACLE9i10g:
+                return "SELECT null FROM dual";
+            default:
+                return "SELECT null";
+        }
+    }
 
 	private String getRandomAlias() {
 		return StringUtilities.getRandomString(8);

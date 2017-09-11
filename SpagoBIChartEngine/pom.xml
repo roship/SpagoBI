@@ -83,11 +83,6 @@
 		
 		<profile>
 			<id>production</id>
-			<activation>
-				<property>
-					<name>minimized-dir</name>
-				</property>
-			</activation>
 			<build>
 				<plugins>
 					<plugin>
@@ -101,7 +96,7 @@
 							</execution>
 						</executions>
 						<configuration>
-							<webappDirectory>${minimized-dir}</webappDirectory>
+							<webappDirectory>${project.build.directory}/minimized-dir</webappDirectory>
 							<!-- Minify only, do not obfuscate -->
 							<nomunge>true</nomunge>
 							<excludes>
@@ -116,8 +111,8 @@
 							</excludes>
 							<aggregations>
 								<aggregation>
-									<inputDir>${minimized-dir}/js/spagobi</inputDir>
-									<output>${basedir}/src/main/webapp/js/spagobi/chart-all-${project.version}.js</output>
+									<inputDir>${project.build.directory}/minimized-dir/js/spagobi</inputDir>
+									<output>${project.build.directory}/${project.artifactId}/js/spagobi/chart-all-${project.version}.js</output>
 									<includes>
 										<include>overrides/overrides-min.js</include>
 										<include>exception/ExceptionHandler-min.js</include>

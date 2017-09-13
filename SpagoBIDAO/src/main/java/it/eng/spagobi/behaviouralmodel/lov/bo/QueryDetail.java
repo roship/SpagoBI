@@ -272,7 +272,7 @@ public class QueryDetail extends AbstractLOV implements ILovDetail {
 	 * @see it.eng.spagobi.behaviouralmodel.lov.bo.ILovDetail#getLovResult( IEngUserProfile profile, List<ObjParuse> dependencies, ExecutionInstance
 	 *      executionInstance) throws Exception;
 	 */
-	 
+
  	@Override
 	public String getLovResult(IEngUserProfile profile, List<ObjParuse> dependencies, List<BIObjectParameter> bIObjectParameters, Locale locale)
 			throws Exception {
@@ -347,7 +347,7 @@ public class QueryDetail extends AbstractLOV implements ILovDetail {
         Map<String, Object> parametersMap = new HashMap<>();
         for (BIObjectParameter biObjectParameter : biObjectParameters) {
             final Parameter parameter = biObjectParameter.getParameter();
-            final String id = "ID_" + parameter.getModalityValue().getId();
+            final String id = "ID_" + biObjectParameter.getId();
             String value = biObjectParameter.getParameterValuesAsString();
 
             final Domain domain = DAOFactory.getDomainDAO().loadDomainById(parameter.getTypeId());

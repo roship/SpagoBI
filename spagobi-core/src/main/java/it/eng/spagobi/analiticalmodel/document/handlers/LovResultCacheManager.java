@@ -13,11 +13,10 @@ import it.eng.spagobi.commons.bo.UserProfile;
 import it.eng.spagobi.commons.utilities.StringUtilities;
 import it.eng.spagobi.utilities.cache.CacheInterface;
 import it.eng.spagobi.utilities.cache.CacheSingleton;
+import org.apache.log4j.Logger;
 
 import java.util.List;
 import java.util.Map;
-
-import org.apache.log4j.Logger;
 
 /**
  * This class caches LOV (list of values) executions' result. The key of the cache element is composed by the user's identifier and the LOV definition. In case
@@ -114,8 +113,7 @@ public class LovResultCacheManager {
 			QueryDetail queryDetail = (QueryDetail) lovDefinition;
 			QueryDetail clone = queryDetail.clone();
 			Map<String, String> parameters = queryDetail.getParametersNameToValueMap(executionInstance.getBIObject().getBiObjectParameters());
-			String statement = queryDetail.getWrappedStatement(dependencies, executionInstance.getBIObject().getBiObjectParameters());
-			statement = StringUtilities.substituteProfileAttributesInString(statement, profile);
+			String statement = queryDetail.getWrappedStatement(dependencies, executionInstance.getBIObject().getBiObjectParameters(), profile);
 			if (parameters != null && !parameters.isEmpty()) {
 				Map<String, String> types = queryDetail.getParametersNameToTypeMap(executionInstance.getBIObject().getBiObjectParameters());
 				statement = StringUtilities.substituteParametersInString(statement, parameters, types, false);

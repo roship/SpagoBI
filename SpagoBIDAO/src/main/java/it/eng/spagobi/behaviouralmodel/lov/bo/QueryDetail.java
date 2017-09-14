@@ -30,6 +30,7 @@ import it.eng.spagobi.commons.utilities.GeneralUtilities;
 import it.eng.spagobi.commons.utilities.StringUtilities;
 import it.eng.spagobi.commons.utilities.UserUtilities;
 import it.eng.spagobi.services.datasource.bo.SpagoBiDataSource;
+import it.eng.spagobi.tools.dataset.common.behaviour.UserProfileUtils;
 import it.eng.spagobi.tools.datasource.bo.IDataSource;
 import it.eng.spagobi.utilities.DateRangeUtils;
 import it.eng.spagobi.utilities.assertion.Assert;
@@ -283,8 +284,7 @@ public class QueryDetail extends AbstractLOV implements ILovDetail {
 			throws Exception {
 		logger.debug("IN");
 		Map<String, String> parameters = getParametersNameToValueMap(BIObjectParameters);
-		String statement = getWrappedStatement(dependencies, BIObjectParameters);
-		statement = StringUtilities.substituteProfileAttributesInString(statement, profile);
+		String statement = getWrappedStatement(dependencies, BIObjectParameters, profile);
 		if (parameters != null && !parameters.isEmpty()) {
 			Map<String, String> types = getParametersNameToTypeMap(BIObjectParameters);
 			statement = StringUtilities.substituteParametersInString(statement, parameters, types, false);
@@ -306,7 +306,7 @@ public class QueryDetail extends AbstractLOV implements ILovDetail {
 	 *            The execution instance (useful to retrieve dependencies values)
 	 * @return the in-line view that filters the original lov using the dependencies.
 	 */
-    public String getWrappedStatement(List<ObjParuse> dependencies, List<BIObjectParameter> BIObjectParameters) throws Exception {
+    public String getWrappedStatement(List<ObjParuse> dependencies, List<BIObjectParameter> BIObjectParameters, IEngUserProfile profile) throws Exception {
         logger.debug("IN");
         String result = getQueryDefinition();
         if (dependencies != null && dependencies.size() > 0 && BIObjectParameters != null) {
@@ -316,9 +316,10 @@ public class QueryDetail extends AbstractLOV implements ILovDetail {
             } else {
                 final String queryDefinition = getQueryDefinition();
                 if (hasInlineParametersDirective(queryDefinition)) {
-                    result = inlineParametersStrategy(queryDefinition, BIObjectParameters);
+                    result = inlineParametersStrategy(queryDefinition, BIObjectParameters, profile);
                 } else {
                     result = defaultParametersStrategy(dependencies, BIObjectParameters);
+					result = StringUtilities.substituteProfileAttributesInString(result, profile);
                 }
             }
         }
@@ -343,8 +344,8 @@ public class QueryDetail extends AbstractLOV implements ILovDetail {
         return false;
     }
 
-    private String inlineParametersStrategy(String queryDefinition, List<BIObjectParameter> biObjectParameters) throws Exception {
-        Map<String, Object> parametersMap = new HashMap<>();
+    private String inlineParametersStrategy(String queryDefinition, List<BIObjectParameter> biObjectParameters, IEngUserProfile profile) throws Exception {
+        Map parametersMap = new HashMap<>();
         for (BIObjectParameter biObjectParameter : biObjectParameters) {
             final Parameter parameter = biObjectParameter.getParameter();
             final String id = "ID_" + biObjectParameter.getId();
@@ -357,6 +358,8 @@ public class QueryDetail extends AbstractLOV implements ILovDetail {
             }
             parametersMap.put(id, value);
         }
+
+		parametersMap.putAll(UserProfileUtils.getProfileAttributes(profile));
 
         return StringUtilities.substituteParametersInString(queryDefinition, parametersMap);
     }

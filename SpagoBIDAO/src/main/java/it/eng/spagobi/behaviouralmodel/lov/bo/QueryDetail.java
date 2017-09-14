@@ -319,10 +319,11 @@ public class QueryDetail extends AbstractLOV implements ILovDetail {
                     result = inlineParametersStrategy(queryDefinition, BIObjectParameters, profile);
                 } else {
                     result = defaultParametersStrategy(dependencies, BIObjectParameters);
-					result = StringUtilities.substituteProfileAttributesInString(result, profile);
                 }
             }
         }
+
+		result = StringUtilities.substituteProfileAttributesInString(result, profile);
         logger.debug("OUT.result=" + result);
         return result;
     }
